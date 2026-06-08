@@ -3,11 +3,20 @@
 # TODO
 
 - 完善可撤销链接的访问
-- 查询是否有未过期的链接，以及各链接的过期时间，可以在导出 html 界面查看，或者使用专门命令查看。
-- html 文件中可以加入视频吗？
+
+- 附件不能太大，如果太大的话会造成导出的 html 文件急剧增大，比如 40M 的视频，在导出单文件 html 文件时会剧增到 300M 的大小。其他附件可能没那么大html 文件中可以加入视频吗？导出含有视频的笔记会有大概率卡死，可以正常观看。但是由于导出 html 文件，其他的大文件也会如此的暴涨体积吗？只要附件的体积大，那么导出的 html 单文件体积就会急剧增大，原因如下：
+    更大的膨胀来自“重复存储”。单文件合并时，index.ts 会把每个网页的完整 HTML 放进 websiteData.webpages[*].data，附件也会进 websiteData.fileInfo[*].data；然后 getCombinedHTML() 又把整包 websiteData 塞进 <data> 标签，并对这段 JSON 再做一次 base64。也就是说，同一个视频可能在页面里一份、在 metadata 里一份，甚至附件数据里再一份，所以 300M 不是离谱现象，而是这种导出方式的自然结果。
+
+
+- 增加预测导出 html 文件大小
+
+- 如果是压缩包为附件的话，导出的html文件是无法点击该附件进行下载的。并且如果是压缩包附件的话，预计的导出文件大小也是不正确的，比如我的压缩包都有 30M大小，但是预估的导出大小只有几MB，而实际导出的html文件大小100M左右
+
+- 什么是目录导出？这个好像可以减少文件的大小，但是这个不好上传到 R2 吧？因为是多文件
+
 - 导出的进度条有点卡卡的
 - 该上传的最大单文件大小为多少？
-
+- 当前最大允许上传的 HTML 单文件大小：理论上 5 GiB。
 
 # Done
 
@@ -17,69 +26,5 @@
 - ✅可选在导出并上传 html 文件后，是否将本地的文件删除的选项。
 - ✅导出的时候 html 文件默认的文件名是笔记的文件名，上传到云端也是如此。
 - ✅~~能否直接延迟 url 的过期时间呢？~~ 这个不行，因为链接在生成时，过期时间就写死在了链接里，无法使用原链接进行延长的。
+- ✅查询是否有未过期的链接，以及各链接的过期时间，在命令面板中有其专属的命令
 
-# Webpage HTML Export
-
-Export html from single files, canvas pages, or whole vaults. Direct access to the exported HTML files allows you to publish your digital garden anywhere. Focuses on flexibility, features, and style parity.
-Demo / docs: [docs.obsidianweb.net](https://docs.obsidianweb.net/)
-
-![image](https://github.com/KosmosisDire/obsidian-webpage-export/assets/39423700/b8e227e4-b12c-47fb-b341-5c5c2f092ffa)
-
-![image](https://github.com/KosmosisDire/obsidian-webpage-export/assets/39423700/06f29e1a-c067-45e7-9882-f9d6aa83776f)
-
-> [!NOTE]  
-> Although the plugin is fully functional it is still under development, so there may be frequent large changes between updates that could effect your workflow! Bugs are also not uncommon, please report anything you find, I am working to make the plugin more stable.
-
-## Features:
-- Full text search
-- File navigation tree
-- Document outline
-- Graph view
-- Theme toggle
-- Optimized for web and mobile
-- Most plugins supported (dataview, tasks, etc...)
-- Option to export html and dependencies into one single file
-
-## Using the Plugin
-Check out the new docs for details on using the plugin:
-https://docs.obsidianweb.net/
-
-## Installation
-
-Install from Obsidian Community Plugins: [Open in Obsidian](https://obsidian.md/plugins?id=webpage-html-export)
-
-### Manual Installation
-
-1. 从 `build/` 目录取出 `main.js`、`manifest.json` 和 `styles.css`。
-2. 将这三个文件放到 `{VaultFolder}/.obsidian/plugins/` 对应插件目录中。
-3. 重新加载 Obsidian。
-
-### Beta Installation
-
-Either follow the instructions above for a beta release, or:
-
-1. Install the [BRAT plugin](https://obsidian.md/plugins?id=obsidian42-brat)
-2. Open the brat settings
-3. Select add beta plugin
-4. Enter `https://github.com/KosmosisDire/obsidian-webpage-export` as the repository.
-5. Select Add Plugin
-
-## Contributing
-
-Only start work on features which have an issue created for them and have been accepted by me!
-A contribution guide may come soon.
-
-## Support This Plugin
-
-This plugin takes a lot of work to maintain and continue adding features. If you want to fund the continued development of this plugin you can do so here:
-
-<a href="https://www.buymeacoffee.com/nathangeorge"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=nathangeorge&button_colour=3ebba4&font_colour=ffffff&font_family=Poppins&outline_colour=ffffff&coffee_colour=FFDD00"></a>
-
-or if you prefer paypal: 
-
-<a href="https://www.paypal.com/donate/?business=HHQBAXQQXT84Q&no_recurring=0&item_name=Hey+%F0%9F%91%8B+I+am+a+Computer+Science+student+working+on+obsidian+plugins.+Thanks+for+your+support%21&currency_code=USD"><img src="https://pics.paypal.com/00/s/MGNjZDA4MDItYzk3MC00NTQ1LTg4ZDAtMzM5MTc4ZmFlMGIy/file.PNG" style="width: 150px;"></a>
-
-## Testing
-
-This project is tested with BrowserStack.
-[BrowserStack](https://www.browserstack.com/open-source) offers free web testing to open source projects, but does not support this project in any other way.

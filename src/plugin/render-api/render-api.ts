@@ -1598,5 +1598,18 @@ export namespace ExportLog {
 	export function isCancelled() {
 		return _MarkdownRendererInternal.checkCancelled();
 	}
+
+	export function wasCancelled() {
+		return _MarkdownRendererInternal.cancelled;
+	}
+
+	export function cancelExport() {
+		if (_MarkdownRendererInternal.batchStarted) {
+			_MarkdownRendererInternal.cancelExport();
+			return;
+		}
+
+		_MarkdownRendererInternal.cancelled = true;
+	}
 }
 

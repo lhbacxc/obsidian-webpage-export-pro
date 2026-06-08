@@ -64,8 +64,10 @@ export class HTMLExporter
 		{
 			const website = await HTMLExporter.exportFiles(files, exportPath, true, Settings.deleteOldFiles, quietProgress);
 			if (!website) return;
+			if (ExportLog.wasCancelled()) return;
 
 			const publishResult = await HTMLExporter.publishAfterExport(exportPath, files, cloudPublishSettings);
+			if (ExportLog.wasCancelled()) return;
 			if (publishResult)
 			{
 				await HTMLExporter.recordCloudPublishHistory(exportPath, cloudPublishSettings, publishResult);
@@ -85,6 +87,7 @@ export class HTMLExporter
 	private static async publishAfterExport(exportPath: Path, files: TFile[], cloudPublishSettings: CloudPublishSettings): Promise<CloudPublishResult | undefined>
 	{
 		if (!cloudPublishSettings.enabled) return;
+		if (ExportLog.wasCancelled()) return;
 
 		try
 		{
@@ -218,6 +221,7 @@ export class HTMLExporter
 				ExportLog.addToProgressCap(website.index.deletedFiles.length / 2);
 				for (const dFile of website.index.deletedFiles)
 				{
+					if (ExportLog.wasCancelled()) return;
 					const path = new Path(dFile, destination.path);
 					
 					// don't delete font files
@@ -238,18 +242,23 @@ export class HTMLExporter
 			
 			if (saveFiles) 
 			{
+				if (ExportLog.wasCancelled()) return;
 				if (Settings.exportOptions.combineAsSingleFile)
 				{
 					await website.saveAsCombinedHTML();
 				}
 				else
 				{
+					if (ExportLog.wasCancelled()) return;
 					await Utils.downloadAttachments(website.index.newFiles.filter((f) => !(f instanceof Webpage)));
+					if (ExportLog.wasCancelled()) return;
 					await Utils.downloadAttachments(website.index.updatedFiles.filter((f) => !(f instanceof Webpage)));
 
 					if (Settings.exportPreset != ExportPreset.RawDocuments)
 					{
+						if (ExportLog.wasCancelled()) return;
 						await Utils.downloadAttachments([website.index.websiteDataAttachment()]);
+						if (ExportLog.wasCancelled()) return;
 						await Utils.downloadAttachments([website.index.indexDataAttachment()]);
 					}
 				}

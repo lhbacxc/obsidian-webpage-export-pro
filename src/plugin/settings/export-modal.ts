@@ -12,6 +12,7 @@ import { i18n } from '../translations/language';
 import { CloudPublishMode, CloudPublishSettings, sanitizeCloudPublishSettings } from '../cloud-publish/cloud-publish-settings';
 import { CloudPublishResult } from '../cloud-publish/cloud-publisher';
 import { ExportLog } from '../render-api/render-api';
+import { ExportSizeEstimate, ExportSizeEstimator } from '../website/export-size-estimator';
 
 export interface ExportInfo
 {
@@ -46,8 +47,13 @@ export class ExportModal extends Modal
 	private exportProgressValueEl?: HTMLProgressElement;
 	private exportProgressTitleEl?: HTMLElement;
 	private exportProgressSubEl?: HTMLElement;
+	private exportSizeEstimateValueEl?: HTMLElement;
+	private exportSizeEstimateDetailsEl?: HTMLElement;
+	private exportCancelButton?: ButtonComponent;
 	private exportLinkInput?: HTMLInputElement;
 	private exportCopyButton?: ButtonComponent;
+	private estimateRefreshTimer?: number;
+	private estimateRequestId: number = 0;
 	public static title: string = i18n.exportModal.title;
 
 	public exportInfo: ExportInfo;
@@ -106,6 +112,7 @@ export class ExportModal extends Modal
 			this.filePicker.title = lang.filePicker.title;
 			this.filePicker.class = "file-picker";
 			await this.filePicker.generate(scrollArea);
+			this.filePicker.onSelectionChanged = () => this.scheduleExportSizeEstimate();
 			
 			if((this.pickedFiles?.length ?? 0 > 0) || Settings.exportOptions.filesToExport.length > 0) 
 			{
@@ -376,6 +383,7 @@ export class ExportModal extends Modal
 			{
 				this.canceled = false;
 				this.pickedFiles = this.filePicker.getSelectedFiles();
+				this.cancelScheduledExportSizeEstimate();
 				this.exportInfo = {
 					canceled: false,
 					pickedFiles: this.pickedFiles,
@@ -435,6 +443,7 @@ export class ExportModal extends Modal
 		}));
 
 		this.createResultSection(contentEl);
+		this.scheduleExportSizeEstimate();
 
 		await Utils.waitUntil(() => this.isClosed, 60 * 60 * 1000, 10);
 		
@@ -454,6 +463,7 @@ export class ExportModal extends Modal
 	private createResultSection(contentEl: HTMLElement)
 	{
 		const lang = i18n.exportModal.result;
+		const sizeLang = i18n.exportModal.sizeEstimate;
 		this.exportResultEl = contentEl.createDiv({ cls: "setting-item" });
 		this.exportResultEl.style.display = "block";
 		this.exportResultEl.style.borderTop = "1px solid var(--background-modifier-border)";
@@ -464,6 +474,21 @@ export class ExportModal extends Modal
 		this.exportStatusEl = this.exportResultEl.createDiv({ cls: "setting-item-description", text: lang.empty });
 		this.exportStatusEl.style.marginTop = "0.35em";
 		this.exportStatusEl.style.whiteSpace = "pre-wrap";
+
+		const estimateWrap = this.exportResultEl.createDiv();
+		estimateWrap.style.marginTop = "0.75em";
+		estimateWrap.style.padding = "0.65em";
+		estimateWrap.style.border = "1px solid var(--background-modifier-border)";
+		estimateWrap.style.borderRadius = "6px";
+		estimateWrap.style.background = "var(--background-secondary)";
+
+		estimateWrap.createEl("div", { text: sizeLang.title }).style.fontWeight = "600";
+		this.exportSizeEstimateValueEl = estimateWrap.createDiv({ cls: "setting-item-description", text: sizeLang.loading });
+		this.exportSizeEstimateValueEl.style.marginTop = "0.35em";
+		this.exportSizeEstimateValueEl.style.whiteSpace = "pre-wrap";
+		this.exportSizeEstimateDetailsEl = estimateWrap.createDiv({ cls: "setting-item-description" });
+		this.exportSizeEstimateDetailsEl.style.marginTop = "0.35em";
+		this.exportSizeEstimateDetailsEl.style.whiteSpace = "pre-wrap";
 
 		const progressWrap = this.exportResultEl.createDiv();
 		progressWrap.style.marginTop = "0.75em";
@@ -481,6 +506,21 @@ export class ExportModal extends Modal
 		this.exportProgressSubEl = progressWrap.createDiv({ cls: "setting-item-description" });
 		this.exportProgressSubEl.style.marginTop = "0.35em";
 		this.exportProgressSubEl.style.whiteSpace = "pre-wrap";
+
+		const cancelRow = progressWrap.createDiv();
+		cancelRow.style.display = "flex";
+		cancelRow.style.justifyContent = "flex-end";
+		cancelRow.style.marginTop = "0.5em";
+		this.exportCancelButton = new ButtonComponent(cancelRow);
+		this.exportCancelButton.setButtonText(sizeLang.cancelExport);
+		this.exportCancelButton.setDisabled(true);
+		this.exportCancelButton.onClick(() =>
+		{
+			ExportLog.cancelExport();
+			this.exportCancelButton?.setButtonText(sizeLang.cancelling);
+			this.exportCancelButton?.setDisabled(true);
+			this.showExportProgress(this.exportProgressValueEl?.value ?? 0, sizeLang.cancelling, "", "var(--color-yellow)");
+		});
 
 		const linkRow = this.exportResultEl.createDiv();
 		linkRow.style.display = "flex";
@@ -505,11 +545,100 @@ export class ExportModal extends Modal
 		});
 	}
 
+	private scheduleExportSizeEstimate()
+	{
+		if (this.estimateRefreshTimer) window.clearTimeout(this.estimateRefreshTimer);
+		this.estimateRefreshTimer = window.setTimeout(() =>
+		{
+			this.refreshExportSizeEstimate();
+		}, 150);
+	}
+
+	private cancelScheduledExportSizeEstimate()
+	{
+		if (this.estimateRefreshTimer) window.clearTimeout(this.estimateRefreshTimer);
+		this.estimateRefreshTimer = undefined;
+		this.estimateRequestId++;
+	}
+
+	private async refreshExportSizeEstimate()
+	{
+		const sizeLang = i18n.exportModal.sizeEstimate;
+		const requestId = ++this.estimateRequestId;
+		const files = this.filePicker?.getSelectedFiles() ?? [];
+
+		if (this.exportSizeEstimateValueEl)
+		{
+			this.exportSizeEstimateValueEl.setText(files.length === 0 ? sizeLang.noFiles : sizeLang.loading);
+			this.exportSizeEstimateValueEl.style.color = "";
+		}
+		if (this.exportSizeEstimateDetailsEl) this.exportSizeEstimateDetailsEl.setText("");
+		if (files.length === 0) return;
+
+		try
+		{
+			const estimate = await ExportSizeEstimator.estimate(files, Settings.exportOptions);
+			if (requestId !== this.estimateRequestId) return;
+			this.showExportSizeEstimate(estimate);
+		}
+		catch (error)
+		{
+			if (requestId !== this.estimateRequestId) return;
+			this.exportSizeEstimateValueEl?.setText(`${sizeLang.failed}: ${error}`);
+		}
+	}
+
+	private showExportSizeEstimate(estimate: ExportSizeEstimate)
+	{
+		const sizeLang = i18n.exportModal.sizeEstimate;
+		const riskText = {
+			low: sizeLang.riskLow,
+			medium: sizeLang.riskMedium,
+			high: sizeLang.riskHigh,
+		}[estimate.riskLevel];
+		const riskColor = {
+			low: "var(--text-muted)",
+			medium: "var(--color-yellow)",
+			high: "var(--color-red)",
+		}[estimate.riskLevel];
+
+		if (this.exportSizeEstimateValueEl)
+		{
+			this.exportSizeEstimateValueEl.setText(`${sizeLang.estimated}: ${ExportSizeEstimator.formatBytes(estimate.estimatedBytes)}\n${sizeLang.risk}: ${riskText}`);
+			this.exportSizeEstimateValueEl.style.color = riskColor;
+		}
+
+		const details = [
+			`${sizeLang.files}: ${estimate.selectedFileCount}`,
+			`${sizeLang.pages}: ${estimate.pageCount}`,
+			`${sizeLang.attachments}: ${estimate.attachmentCount}`,
+			`${sizeLang.mediaEmbeds}: ${estimate.mediaOccurrenceCount}`,
+		];
+
+		if (estimate.mediaInlineBytes > 0)
+		{
+			details.push(`${sizeLang.inlineMedia}: ${ExportSizeEstimator.formatBytes(estimate.rawMediaBytes)} -> ${ExportSizeEstimator.formatBytes(estimate.mediaInlineBytes)}`);
+		}
+		if (estimate.metadataBytes > 0)
+		{
+			details.push(`${sizeLang.combinedMetadata}: ${ExportSizeEstimator.formatBytes(estimate.metadataBytes)}`);
+		}
+		if (estimate.attachmentDataBytes > 0)
+		{
+			details.push(`${sizeLang.attachmentMetadata}: ${ExportSizeEstimator.formatBytes(estimate.attachmentDataBytes)}`);
+		}
+		if (estimate.riskLevel === "high") details.push(sizeLang.highRiskHint);
+		this.exportSizeEstimateDetailsEl?.setText(details.join("\n"));
+	}
+
 	private setExportRunning(running: boolean)
 	{
-		if (!this.exportButton) return;
-		this.exportButton.setDisabled(running);
-		this.exportButton.buttonEl.style.opacity = running ? "0.5" : "1";
+		if (this.exportButton) {
+			this.exportButton.setDisabled(running);
+			this.exportButton.buttonEl.style.opacity = running ? "0.5" : "1";
+		}
+		this.exportCancelButton?.setDisabled(!running);
+		this.exportCancelButton?.setButtonText(i18n.exportModal.sizeEstimate.cancelExport);
 	}
 
 	private showExportStatus(message: string)
@@ -587,6 +716,7 @@ export class ExportModal extends Modal
 	{
 		const { contentEl } = this;
 		contentEl.empty();
+		if (this.estimateRefreshTimer) window.clearTimeout(this.estimateRefreshTimer);
 		this.isClosed = true;
 		ExportModal.title = i18n.exportModal.title;
 	}

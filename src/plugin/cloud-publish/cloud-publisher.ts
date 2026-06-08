@@ -6,6 +6,7 @@ import { Path } from "src/plugin/utils/path";
 import { getCombinedHtmlFileName } from "src/plugin/website/website";
 import { CloudPublishSettings, cloudPublishConfigComplete, CloudUploadStrategy, normalizeKeyPrefix } from "./cloud-publish-settings";
 import { R2Client, R2UploadObject } from "./r2-client";
+import { ExportLog } from "../render-api/render-api";
 
 export interface CloudPublishResult {
 	uploadedCount: number;
@@ -55,6 +56,7 @@ export class CloudPublisher {
 		}
 
 		for (const candidate of candidates) {
+			if (ExportLog.wasCancelled()) return result;
 			try {
 				await this.r2Client.uploadObject(candidate);
 				result.uploadedCount++;
@@ -67,6 +69,7 @@ export class CloudPublisher {
 			}
 		}
 
+		if (ExportLog.wasCancelled()) return result;
 		if (this.settings.createPresignedUrl && result.entryKey && this.settings.publishMode === "presigned-url") {
 			try {
 				result.presignedUrl = this.r2Client.createPresignedGetUrl(result.entryKey, this.settings.presignedUrlExpireSeconds);

@@ -77,6 +77,27 @@ export interface i18n
 			copy: string;
 			copied: string;
 		};
+		sizeEstimate: {
+			title: string;
+			loading: string;
+			noFiles: string;
+			estimated: string;
+			risk: string;
+			riskLow: string;
+			riskMedium: string;
+			riskHigh: string;
+			files: string;
+			pages: string;
+			attachments: string;
+			mediaEmbeds: string;
+			inlineMedia: string;
+			combinedMetadata: string;
+			attachmentMetadata: string;
+			highRiskHint: string;
+			cancelExport: string;
+			cancelling: string;
+			failed: string;
+		};
 		filePicker: 
 		{
 			title: string;

@@ -490,7 +490,46 @@ export class Website
 
 	public async getCombinedHTML(): Promise<string>
 	{
-		// get index.html
+		let html = "";
+		for await (const chunk of this.getCombinedHTMLChunks()) html += chunk;
+		return html;
+	}
+
+	public async saveAsCombinedHTML(): Promise<void>
+	{
+		const path = this.destination.joinString(getCombinedHtmlFileName(this.sourceFiles, this.exportOptions));
+		await path.createDirectory();
+		await path.write(this.getCombinedHTMLChunks());
+	}
+
+	private async *getCombinedHTMLChunks(): AsyncIterable<string>
+	{
+		const index = this.getCombinedHTMLIndexPage();
+		if (!index?.data) return;
+
+		const html = index.data.toString();
+		const lowerHtml = html.toLowerCase();
+		const headCloseIndex = lowerHtml.indexOf("</head>");
+		const headInsert = AssetHandler.getHeadReferences(this.exportOptions);
+		const metadata = this.getCombinedHTMLMetadataEntries();
+
+		if (headCloseIndex < 0)
+		{
+			yield headInsert;
+			yield* this.createCombinedMetadataChunks(metadata);
+			yield* this.yieldTextChunks(html);
+			return;
+		}
+
+		yield* this.yieldTextChunks(html, 0, headCloseIndex);
+		await this.yieldIfNeeded();
+		yield headInsert;
+		yield* this.createCombinedMetadataChunks(metadata);
+		yield* this.yieldTextChunks(html, headCloseIndex);
+	}
+
+	private getCombinedHTMLIndexPage(): Webpage | undefined
+	{
 		let index = this.index.webpages.find((file) => file.filename == "index.html");
 		if (!index?.data && this.index.webpages.length > 0)
 		{
@@ -501,52 +540,188 @@ export class Website
 		if (!index?.data)
 		{
 			ExportLog.error("No index.html found, website creation failed");
-			return "";
+			return;
 		}
 
-		let html = new DOMParser().parseFromString(index.data as string, "text/html");
+		return index;
+	}
 
-		// insert head references
-		html.head.innerHTML += AssetHandler.getHeadReferences(this.exportOptions);
-
-		// define metadata
-		let metadataScript = html.head.createEl("data");
-		metadataScript.id = "website-metadata";
-
+	private getCombinedHTMLMetadataEntries()
+	{
 		const fileInfo = this.index.websiteData.fileInfo;
 		const webpages = this.index.websiteData.webpages;
 		// @ts-ignore
 		delete this.index.websiteData.fileInfo;
 		// @ts-ignore
 		delete this.index.websiteData.webpages;
-		metadataScript.setAttribute("value", btoa(encodeURI(JSON.stringify(this.index.websiteData))));
 
-		// create a data element with the id being the file path for each file
-		for (const [path, data] of Object.entries(webpages))
-		{
-			const dataElement = html.head.createEl("data");
-			dataElement.id = btoa(encodeURI(path));
-			dataElement.setAttribute("value", btoa(encodeURI(JSON.stringify(data))));
-		}
-
-		// do the same for file info skipping already existing elements
-		for (const [path, data] of Object.entries(fileInfo))
-		{
-			if (html.getElementById(btoa(encodeURI(path)))) continue;
-			const dataElement = html.head.createEl("data");
-			dataElement.id = btoa(encodeURI(path));
-			dataElement.setAttribute("value", btoa(encodeURI(JSON.stringify(data))));
-		}
-
-		return `<!DOCTYPE html>\n${html.documentElement.outerHTML}`;
+		return { rootData: this.index.websiteData, webpages, fileInfo };
 	}
 
-	public async saveAsCombinedHTML(): Promise<void>
+	private async *createCombinedMetadataChunks(metadata: ReturnType<Website["getCombinedHTMLMetadataEntries"]>): AsyncIterable<string>
 	{
-		const html = await this.getCombinedHTML();
-		const path = this.destination.joinString(getCombinedHtmlFileName(this.sourceFiles, this.exportOptions));
-		await path.write(html);
+		const usedIds = new Set<string>();
+		yield* this.createDataElementChunks("website-metadata", metadata.rootData);
+
+		for (const [path, data] of Object.entries(metadata.webpages))
+		{
+			const id = this.encodeSmallDataValue(path);
+			usedIds.add(id);
+			yield* this.createDataElementChunks(id, data);
+		}
+
+		for (const [path, data] of Object.entries(metadata.fileInfo))
+		{
+			const id = this.encodeSmallDataValue(path);
+			if (usedIds.has(id)) continue;
+			yield* this.createDataElementChunks(id, data);
+		}
 	}
+
+	private async *createDataElementChunks(id: string, data: unknown): AsyncIterable<string>
+	{
+		if (ExportLog.wasCancelled()) return;
+		yield `<data id="${id}" value="`;
+		yield* this.encodeJsonForDataAttributeChunks(data);
+		yield `"></data>`;
+		await this.yieldIfNeeded();
+	}
+
+	private async *encodeJsonForDataAttributeChunks(data: unknown): AsyncIterable<string>
+	{
+		let carry = "";
+		let chunksSinceYield = 0;
+		for (const chunk of stringifyJsonChunks(data))
+		{
+			if (ExportLog.wasCancelled()) return;
+			const encoded = carry + encodeURI(chunk);
+			const encodableLength = encoded.length - (encoded.length % 3);
+
+			if (encodableLength > 0)
+			{
+				yield btoa(encoded.slice(0, encodableLength));
+				carry = encoded.slice(encodableLength);
+			}
+			else
+			{
+				carry = encoded;
+			}
+
+			chunksSinceYield++;
+			if (chunksSinceYield >= 8)
+			{
+				chunksSinceYield = 0;
+				await this.yieldIfNeeded();
+			}
+		}
+
+		if (carry.length > 0 && !ExportLog.wasCancelled()) yield btoa(carry);
+	}
+
+	private encodeSmallDataValue(value: string): string
+	{
+		return btoa(encodeURI(value));
+	}
+
+	private async yieldIfNeeded(): Promise<void>
+	{
+		await Utils.delay(0);
+	}
+
+	private async *yieldTextChunks(text: string, start: number = 0, end: number = text.length): AsyncIterable<string>
+	{
+		for (let position = start; position < end; position += JSON_STRING_CHUNK_SIZE)
+		{
+			if (ExportLog.wasCancelled()) return;
+			yield text.slice(position, Math.min(position + JSON_STRING_CHUNK_SIZE, end));
+			await this.yieldIfNeeded();
+		}
+	}
+}
+
+const JSON_STRING_CHUNK_SIZE = 256 * 1024;
+
+function* stringifyJsonChunks(value: unknown): Iterable<string>
+{
+	if (value === null || typeof value === "number" || typeof value === "boolean")
+	{
+		yield JSON.stringify(value);
+		return;
+	}
+
+	if (typeof value === "string")
+	{
+		yield* stringifyJsonStringChunks(value);
+		return;
+	}
+
+	if (Array.isArray(value))
+	{
+		yield "[";
+		for (let i = 0; i < value.length; i++)
+		{
+			if (i > 0) yield ",";
+			yield* stringifyJsonChunks(value[i]);
+		}
+		yield "]";
+		return;
+	}
+
+	if (typeof value === "object")
+	{
+		yield "{";
+		let first = true;
+		for (const [key, child] of Object.entries(value as Record<string, unknown>))
+		{
+			if (child === undefined || typeof child === "function") continue;
+			if (!first) yield ",";
+			first = false;
+			yield* stringifyJsonStringChunks(key);
+			yield ":";
+			yield* stringifyJsonChunks(child);
+		}
+		yield "}";
+		return;
+	}
+
+	yield "null";
+}
+
+function* stringifyJsonStringChunks(value: string): Iterable<string>
+{
+	yield "\"";
+	for (let start = 0; start < value.length;)
+	{
+		let end = Math.min(start + JSON_STRING_CHUNK_SIZE, value.length);
+		if (end < value.length && isHighSurrogate(value.charCodeAt(end - 1))) end--;
+		yield escapeJsonString(value.slice(start, end));
+		start = end;
+	}
+	yield "\"";
+}
+
+function escapeJsonString(value: string): string
+{
+	return value.replace(/[\\\"\u0000-\u001f]/g, (char) =>
+	{
+		switch (char)
+		{
+			case "\\": return "\\\\";
+			case "\"": return "\\\"";
+			case "\b": return "\\b";
+			case "\f": return "\\f";
+			case "\n": return "\\n";
+			case "\r": return "\\r";
+			case "\t": return "\\t";
+			default:
+				return "\\u" + char.charCodeAt(0).toString(16).padStart(4, "0");
+		}
+	});
+}
+
+function isHighSurrogate(charCode: number): boolean
+{
+	return charCode >= 0xd800 && charCode <= 0xdbff;
 }
 
 export function getCombinedHtmlFileName(sourceFiles: TFile[], exportOptions: ExportPipelineOptions): string

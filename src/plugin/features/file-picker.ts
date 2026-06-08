@@ -9,6 +9,7 @@ export class FilePickerTree extends FileTree
 {
 	public children: FilePickerTreeItem[] = [];
 	public selectAllItem: FilePickerTreeItem | undefined;
+	public onSelectionChanged: (() => void) | undefined;
 
 	public constructor(files: Path[], keepOriginalExtensions: boolean = false, sort = true)
 	{
@@ -121,6 +122,7 @@ export class FilePickerTree extends FileTree
 			const checked = selectAllButton.checkbox.checked;
 			selectAllButton.check(!checked);
 			localThis.forAllChildren((child) => child.check(!checked));
+			localThis.onSelectionChanged?.();
 		}
 
 		selectAllButton.checkbox.addEventListener("click", (event) =>
@@ -222,6 +224,8 @@ export class FilePickerTree extends FileTree
 		{
 			this.selectAllItem?.check(false, false, true);
 		}
+
+		this.onSelectionChanged?.();
 	}
 }
 
