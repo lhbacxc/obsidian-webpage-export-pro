@@ -1,3 +1,16 @@
+在原版功能下新增了下述的功能
+
+# TODO
+
+- 在导出 html 笔记时增加上传到 CFR2 中，并采用预签名 url 的链接进行访问。
+- 查询是否有未过期的链接，以及各链接的过期时间，可以在导出 html 界面查看，或者使用专门命令查看。
+- 在导出 html 界面，将导出过程移到后台，导出结束后导出界面不关闭，也不主动打开导出文件所在的文件夹，导出成功后在导出界面显示链接，右上角 ob 显示导出成功信息。
+- 可选在导出并上传 html 文件后，是否将本地的文件删除的选项
+
+# Done
+
+
+
 # Webpage HTML Export
 
 Export html from single files, canvas pages, or whole vaults. Direct access to the exported HTML files allows you to publish your digital garden anywhere. Focuses on flexibility, features, and style parity.
@@ -30,9 +43,9 @@ Install from Obsidian Community Plugins: [Open in Obsidian](https://obsidian.md/
 
 ### Manual Installation
 
-1. Download the `.zip` file from the [Latest Release](https://github.com/KosmosisDire/obsidian-webpage-export/releases/latest), or from any other release version.
-2. Unzip into: `{VaultFolder}/.obsidian/plugins/`
-3. Reload obsidian
+1. 从 `build/` 目录取出 `main.js`、`manifest.json` 和 `styles.css`。
+2. 将这三个文件放到 `{VaultFolder}/.obsidian/plugins/` 对应插件目录中。
+3. 重新加载 Obsidian。
 
 ### Beta Installation
 

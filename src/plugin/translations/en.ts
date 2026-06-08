@@ -25,6 +25,28 @@ export const language: i18n =
 		moreOptions: "More options located on the plugin settings page.",
 		openAfterExport: "Open after export",
 		exportButton: "Export",
+		cloudPublish: {
+			title: "Cloud publish for this export",
+			description: "These options only affect this export and are not saved to plugin settings.",
+			presignedUrl: "Presigned URL",
+			revocableLink: "Revocable link",
+			expireSeconds: "Expiry seconds",
+			expireSecondsDescription: "Used only for this export's presigned URL. Maximum supported value is 604800 seconds.",
+			expireSecondsError: "Enter a positive integer.",
+		},
+		result: {
+			title: "Export result",
+			empty: "The publish link will appear here after export.",
+			running: "Exporting and publishing in the background...",
+			finished: "Export finished",
+			failed: "Export failed",
+			cancelled: "Export cancelled",
+			uploaded: "Uploaded",
+			failedCount: "Upload failed",
+			noLink: "No link to copy yet",
+			copy: "Copy link",
+			copied: "Link copied",
+		},
 		filePicker: 
 		{
 			title: "Select all files in exported vault",
@@ -213,6 +235,102 @@ export const language: i18n =
 		addPageIcon: {
 			title: "Add Page Icon",
 			description: "Add the file's icon to the page header",
+		},
+		cloudPublishSettingsSection: {
+			title: "Cloud Publish",
+			description: "Upload exported HTML to Cloudflare R2 and optionally create a public access URL.",
+		},
+		cloudPublishEnabled: {
+			title: "Upload after export",
+			description: "When enabled, a successful local export will be uploaded to Cloudflare R2.",
+		},
+		cloudUploadStrategy: {
+			title: "Upload strategy",
+			description: "Auto uploads a single HTML file for combined exports, or the whole export directory for normal websites.",
+			options: {
+				"Auto": "auto",
+				"Single HTML": "single-html",
+				"Directory": "directory",
+			},
+		},
+		r2AccountId: {
+			title: "R2 Account ID",
+			description: "Used to build the default R2 endpoint when Endpoint URL is empty.",
+		},
+		r2EndpointUrl: {
+			title: "R2 Endpoint URL",
+			description: "Optional S3-compatible endpoint. Leave empty to use the Account ID endpoint.",
+		},
+		r2Bucket: {
+			title: "R2 Bucket",
+			description: "Bucket that receives exported files.",
+		},
+		r2KeyPrefix: {
+			title: "R2 Key Prefix",
+			description: "Optional prefix added before uploaded object keys.",
+		},
+		r2AccessKeyId: {
+			title: "R2 Access Key ID",
+			description: "Cloudflare R2 S3 access key ID.",
+		},
+		r2SecretAccessKey: {
+			title: "R2 Secret Access Key",
+			description: "Stored locally in plugin data as plain text.",
+		},
+		cloudPublishMode: {
+			title: "Publish mode",
+			description: "Revocable links are reserved for a future Worker + KV implementation.",
+			options: {
+				"Presigned URL": "presigned-url",
+				"Revocable link": "revocable-link",
+			},
+		},
+		createPresignedUrl: {
+			title: "Create presigned URL",
+			description: "Create a presigned URL for the exported entry HTML after upload.",
+		},
+		presignedUrlExpireSeconds: {
+			title: "Presigned URL expiry seconds",
+			description: "Maximum supported value is 604800 seconds.",
+			validationError: "Enter a positive integer.",
+		},
+		workerBaseUrl: {
+			title: "Worker Base URL",
+			description: "Reserved for revocable links. Not used by the first implementation.",
+		},
+		workerAdminToken: {
+			title: "Worker Admin Token",
+			description: "Reserved for revocable links. Stored locally as plain text.",
+		},
+		revocableLinkReserved: {
+			title: "Revocable links",
+			description: "The interface is reserved, but Worker + KV revocable links are not implemented yet.",
+		},
+		webdavUrl: {
+			title: "WebDAV URL",
+			description: "Base WebDAV directory URL used to download remote config.",
+		},
+		webdavUsername: {
+			title: "WebDAV Username",
+			description: "Optional Basic Auth username.",
+		},
+		webdavPassword: {
+			title: "WebDAV Password",
+			description: "Optional Basic Auth password. Stored locally as plain text.",
+		},
+		webdavRemotePath: {
+			title: "WebDAV Remote Path",
+			description: "Remote JSON config path under the WebDAV URL.",
+		},
+		webdavDownloadCloud: {
+			title: "Download cloud publish config",
+			description: "Download WebDAV config and only overwrite Cloud Publish settings.",
+			button: "Download cloud config",
+		},
+		webdavDownloadAll: {
+			title: "Overwrite all plugin settings",
+			description: "Download WebDAV config and overwrite the full plugin settings after confirmation.",
+			button: "Overwrite all",
 		},
 		obsidianSettingsSection: {
 			title: "Obsidian Settings",

@@ -30,6 +30,28 @@ export interface i18n
 		moreOptions: string;
 		openAfterExport: string;
 		exportButton: string;
+		cloudPublish: {
+			title: string;
+			description: string;
+			presignedUrl: string;
+			revocableLink: string;
+			expireSeconds: string;
+			expireSecondsDescription: string;
+			expireSecondsError: string;
+		};
+		result: {
+			title: string;
+			empty: string;
+			running: string;
+			finished: string;
+			failed: string;
+			cancelled: string;
+			uploaded: string;
+			failedCount: string;
+			noLink: string;
+			copy: string;
+			copied: string;
+		};
 		filePicker: 
 		{
 			title: string;
@@ -217,6 +239,95 @@ export interface i18n
 		addPageIcon: {
 			title: string;
 			description: string;
+		},
+		cloudPublishSettingsSection: {
+			title: string;
+			description: string;
+		},
+		cloudPublishEnabled: {
+			title: string;
+			description: string;
+		},
+		cloudUploadStrategy: {
+			title: string;
+			description: string;
+			options: Record<string, string>;
+		},
+		r2AccountId: {
+			title: string;
+			description: string;
+		},
+		r2EndpointUrl: {
+			title: string;
+			description: string;
+		},
+		r2Bucket: {
+			title: string;
+			description: string;
+		},
+		r2KeyPrefix: {
+			title: string;
+			description: string;
+		},
+		r2AccessKeyId: {
+			title: string;
+			description: string;
+		},
+		r2SecretAccessKey: {
+			title: string;
+			description: string;
+		},
+		cloudPublishMode: {
+			title: string;
+			description: string;
+			options: Record<string, string>;
+		},
+		createPresignedUrl: {
+			title: string;
+			description: string;
+		},
+		presignedUrlExpireSeconds: {
+			title: string;
+			description: string;
+			validationError: string;
+		},
+		workerBaseUrl: {
+			title: string;
+			description: string;
+		},
+		workerAdminToken: {
+			title: string;
+			description: string;
+		},
+		revocableLinkReserved: {
+			title: string;
+			description: string;
+		},
+		webdavUrl: {
+			title: string;
+			description: string;
+		},
+		webdavUsername: {
+			title: string;
+			description: string;
+		},
+		webdavPassword: {
+			title: string;
+			description: string;
+		},
+		webdavRemotePath: {
+			title: string;
+			description: string;
+		},
+		webdavDownloadCloud: {
+			title: string;
+			description: string;
+			button: string;
+		},
+		webdavDownloadAll: {
+			title: string;
+			description: string;
+			button: string;
 		},
 		obsidianSettingsSection: {
 			title: string;

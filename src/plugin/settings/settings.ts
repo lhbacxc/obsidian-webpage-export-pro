@@ -1,4 +1,4 @@
-import { Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, getIcon } from 'obsidian';
+import { Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, getIcon } from 'obsidian';
 import { Path } from 'src/plugin/utils/path';
 import pluginStylesBlacklist from 'src/assets/third-party-styles-blacklist.txt';
 import { ExportLog } from 'src/plugin/render-api/render-api';
@@ -12,6 +12,8 @@ import supportedStyleIds from "src/assets/plugin-style-ids.json";
 import { SupportedPluginStyles } from '../asset-loaders/supported-plugin-styles';
 import postcss from 'postcss';
 import safeParser from 'postcss-safe-parser';
+import { CloudPublishMode, CloudPublishSettings, CloudUploadStrategy, DEFAULT_CLOUD_PUBLISH_SETTINGS, sanitizeCloudPublishSettings } from '../cloud-publish/cloud-publish-settings';
+import { downloadWebdavConfig } from '../cloud-publish/webdav-config-sync';
 
 // #region Settings Definition
 
@@ -44,6 +46,7 @@ export class Settings
 	public static deleteOldFiles: boolean = true;
 	public static exportPreset: ExportPreset = ExportPreset.Online;
 	public static openAfterExport: boolean = true;
+	public static cloudPublish: CloudPublishSettings = sanitizeCloudPublishSettings(DEFAULT_CLOUD_PUBLISH_SETTINGS);
 
 	// Graph View Settings
 	public static filePickerBlacklist: string[] = ["(^|\\/)node_modules\\/","(^|\\/)dist\\/","(^|\\/)dist-ssr\\/","(^|\\/)\\.vscode\\/"]; // ignore node_modules, dist, and .vscode
@@ -355,6 +358,121 @@ export class SettingsPage extends PluginSettingTab
 
 		// #endregion
 
+		// #region Cloud Publish Settings
+
+		createDivider(container);
+
+		section = createSection(container, lang.cloudPublishSettingsSection.title,
+			lang.cloudPublishSettingsSection.description);
+
+		createToggle(section, lang.cloudPublishEnabled.title,
+			() => Settings.cloudPublish.enabled,
+			(value) => Settings.cloudPublish.enabled = value,
+			lang.cloudPublishEnabled.description);
+
+		createDropdown(section, lang.cloudUploadStrategy.title,
+			() => Settings.cloudPublish.uploadStrategy,
+			(value) => Settings.cloudPublish.uploadStrategy = value as CloudUploadStrategy,
+			lang.cloudUploadStrategy.options,
+			lang.cloudUploadStrategy.description);
+
+		createText(section, lang.r2AccountId.title,
+			() => Settings.cloudPublish.accountId,
+			(value) => Settings.cloudPublish.accountId = value,
+			lang.r2AccountId.description);
+
+		createText(section, lang.r2EndpointUrl.title,
+			() => Settings.cloudPublish.endpointUrl,
+			(value) => Settings.cloudPublish.endpointUrl = value,
+			lang.r2EndpointUrl.description);
+
+		createText(section, lang.r2Bucket.title,
+			() => Settings.cloudPublish.bucket,
+			(value) => Settings.cloudPublish.bucket = value,
+			lang.r2Bucket.description);
+
+		createText(section, lang.r2KeyPrefix.title,
+			() => Settings.cloudPublish.keyPrefix,
+			(value) => Settings.cloudPublish.keyPrefix = value,
+			lang.r2KeyPrefix.description);
+
+		createText(section, lang.r2AccessKeyId.title,
+			() => Settings.cloudPublish.accessKeyId,
+			(value) => Settings.cloudPublish.accessKeyId = value,
+			lang.r2AccessKeyId.description);
+
+		this.createSecretText(section, lang.r2SecretAccessKey.title,
+			() => Settings.cloudPublish.secretAccessKey,
+			(value) => Settings.cloudPublish.secretAccessKey = value,
+			lang.r2SecretAccessKey.description);
+
+		createDropdown(section, lang.cloudPublishMode.title,
+			() => Settings.cloudPublish.publishMode,
+			(value) => Settings.cloudPublish.publishMode = value as CloudPublishMode,
+			lang.cloudPublishMode.options,
+			lang.cloudPublishMode.description);
+
+		createToggle(section, lang.createPresignedUrl.title,
+			() => Settings.cloudPublish.createPresignedUrl,
+			(value) => Settings.cloudPublish.createPresignedUrl = value,
+			lang.createPresignedUrl.description);
+
+		createText(section, lang.presignedUrlExpireSeconds.title,
+			() => Settings.cloudPublish.presignedUrlExpireSeconds.toString(),
+			(value) => Settings.cloudPublish.presignedUrlExpireSeconds = parseInt(value, 10),
+			lang.presignedUrlExpireSeconds.description,
+			(value) => (/^[1-9]\d*$/.test(value) ? "" : lang.presignedUrlExpireSeconds.validationError));
+
+		createText(section, lang.workerBaseUrl.title,
+			() => Settings.cloudPublish.workerBaseUrl,
+			(value) => Settings.cloudPublish.workerBaseUrl = value,
+			lang.workerBaseUrl.description);
+
+		this.createSecretText(section, lang.workerAdminToken.title,
+			() => Settings.cloudPublish.workerAdminToken,
+			(value) => Settings.cloudPublish.workerAdminToken = value,
+			lang.workerAdminToken.description);
+
+		new Setting(section)
+			.setName(lang.revocableLinkReserved.title)
+			.setDesc(lang.revocableLinkReserved.description);
+
+		createText(section, lang.webdavUrl.title,
+			() => Settings.cloudPublish.webdavUrl,
+			(value) => Settings.cloudPublish.webdavUrl = value,
+			lang.webdavUrl.description);
+
+		createText(section, lang.webdavUsername.title,
+			() => Settings.cloudPublish.webdavUsername,
+			(value) => Settings.cloudPublish.webdavUsername = value,
+			lang.webdavUsername.description);
+
+		this.createSecretText(section, lang.webdavPassword.title,
+			() => Settings.cloudPublish.webdavPassword,
+			(value) => Settings.cloudPublish.webdavPassword = value,
+			lang.webdavPassword.description);
+
+		createText(section, lang.webdavRemotePath.title,
+			() => Settings.cloudPublish.webdavRemotePath,
+			(value) => Settings.cloudPublish.webdavRemotePath = value,
+			lang.webdavRemotePath.description);
+
+		new Setting(section)
+			.setName(lang.webdavDownloadCloud.title)
+			.setDesc(lang.webdavDownloadCloud.description)
+			.addButton((button) => button
+				.setButtonText(lang.webdavDownloadCloud.button)
+				.onClick(() => this.downloadCloudPublishSettingsOnly()));
+
+		new Setting(section)
+			.setName(lang.webdavDownloadAll.title)
+			.setDesc(lang.webdavDownloadAll.description)
+			.addButton((button) => button
+				.setButtonText(lang.webdavDownloadAll.button)
+				.onClick(() => this.confirmDownloadAllSettings()));
+
+		// #endregion
+
 		// #region Obsidian Settings
 
 		createDivider(container);
@@ -392,6 +510,88 @@ export class SettingsPage extends PluginSettingTab
 	constructor(plugin: Plugin) {
 		super(app, plugin);
 		SettingsPage.plugin = plugin;
+	}
+
+	private createSecretText(container: HTMLElement, name: string, get: () => string, set: (value: string) => void, desc: string = ""): Setting
+	{
+		const setting = new Setting(container);
+		setting.setName(name);
+		if (desc != "") setting.setDesc(desc);
+		setting.addText((text) => text
+			.setValue(get())
+			.onChange(async (value) => {
+				set(value);
+				await SettingsPage.saveSettings();
+			}));
+		const textInput = setting.controlEl.querySelector("input");
+		if (textInput) textInput.setAttribute("type", "password");
+		return setting;
+	}
+
+	private async downloadCloudPublishSettingsOnly()
+	{
+		try
+		{
+			const remote = await downloadWebdavConfig(Settings.cloudPublish);
+			const source = this.extractCloudPublishSource(remote);
+			const merged = SettingsPage.deepCopy(Settings.cloudPublish);
+			SettingsPage.deepAssign(merged, source);
+			Settings.cloudPublish = sanitizeCloudPublishSettings(merged);
+			await SettingsPage.saveSettings();
+			this.display();
+			new Notice(i18n.settings.webdavDownloadCloud.title + ": OK", 5000);
+		}
+		catch (error)
+		{
+			new Notice(i18n.settings.webdavDownloadCloud.title + ": " + error, 5000);
+		}
+	}
+
+	private confirmDownloadAllSettings()
+	{
+		const modal = new Modal(app);
+		modal.titleEl.setText(i18n.settings.webdavDownloadAll.title);
+		modal.contentEl.createEl("p", { text: i18n.settings.webdavDownloadAll.description });
+		modal.open();
+
+		new Setting(modal.contentEl)
+			.addButton((button) => button
+				.setButtonText(i18n.cancel)
+				.onClick(() => modal.close()))
+			.addButton((button) => button
+				.setButtonText(i18n.settings.webdavDownloadAll.button)
+				.onClick(async () => {
+					modal.close();
+					await this.downloadAllSettings();
+				}));
+	}
+
+	private async downloadAllSettings()
+	{
+		try
+		{
+			const remote = await downloadWebdavConfig(Settings.cloudPublish);
+			SettingsPage.deepAssign(Settings, remote);
+			Settings.exportOptions.reconstructFeatureOptions();
+			Settings.cloudPublish = sanitizeCloudPublishSettings(Settings.cloudPublish);
+			await SettingsPage.saveSettings();
+			this.display();
+			new Notice(i18n.settings.webdavDownloadAll.title + ": OK", 5000);
+		}
+		catch (error)
+		{
+			new Notice(i18n.settings.webdavDownloadAll.title + ": " + error, 5000);
+		}
+	}
+
+	private extractCloudPublishSource(remote: unknown): unknown
+	{
+		if (remote && typeof remote === "object" && "cloudPublish" in remote)
+		{
+			return (remote as { cloudPublish?: unknown }).cloudPublish;
+		}
+
+		return remote;
 	}
 
 	getPluginIDs(): string[]
@@ -639,6 +839,7 @@ export class SettingsPage extends PluginSettingTab
 		SettingsPage.deepAssign(Settings, loadedSettings);
 		// Reconstruct feature option instances to preserve constructor-set properties
 		Settings.exportOptions.reconstructFeatureOptions();
+		Settings.cloudPublish = sanitizeCloudPublishSettings(Settings.cloudPublish);
 		SettingsPage.saveSettings();
 		SettingsPage.loaded = true;
 	}

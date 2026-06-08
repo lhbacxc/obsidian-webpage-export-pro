@@ -25,6 +25,28 @@ export const language: i18n =
 		moreOptions: "更多选项请查看插件设置页面。",
 		openAfterExport: "导出后打开",
 		exportButton: "导出",
+		cloudPublish: {
+			title: "本次云发布",
+			description: "这些选项只影响本次导出，不会写回插件设置。",
+			presignedUrl: "预签名 URL",
+			revocableLink: "可撤销链接",
+			expireSeconds: "过期秒数",
+			expireSecondsDescription: "仅用于本次导出的预签名 URL，最大支持 604800 秒。",
+			expireSecondsError: "请输入正整数。",
+		},
+		result: {
+			title: "导出结果",
+			empty: "导出完成后会在这里显示发布链接。",
+			running: "正在后台导出并发布...",
+			finished: "导出完成",
+			failed: "导出失败",
+			cancelled: "导出已取消",
+			uploaded: "已上传",
+			failedCount: "上传失败",
+			noLink: "暂无可复制链接",
+			copy: "复制链接",
+			copied: "链接已复制",
+		},
 		filePicker:
 		{
 			title: "选择导出库中的所有文件",
@@ -212,6 +234,102 @@ export const language: i18n =
 		addPageIcon: {
 			title: "添加页面图标",
 			description: "在页面标题中添加文件的图标",
+		},
+		cloudPublishSettingsSection: {
+			title: "云发布",
+			description: "将导出的 HTML 上传到 Cloudflare R2，并可选择生成访问链接。",
+		},
+		cloudPublishEnabled: {
+			title: "导出后上传",
+			description: "开启后，本地导出成功时会继续上传到 Cloudflare R2。",
+		},
+		cloudUploadStrategy: {
+			title: "上传策略",
+			description: "自动模式会在单文件导出时上传单个 HTML，在普通网站导出时上传整个导出目录。",
+			options: {
+				"自动": "auto",
+				"单个 HTML": "single-html",
+				"整个目录": "directory",
+			},
+		},
+		r2AccountId: {
+			title: "R2 Account ID",
+			description: "Endpoint URL 为空时，用于自动生成 R2 endpoint。",
+		},
+		r2EndpointUrl: {
+			title: "R2 Endpoint URL",
+			description: "可选的 S3 兼容 endpoint。留空时使用 Account ID 自动生成。",
+		},
+		r2Bucket: {
+			title: "R2 Bucket",
+			description: "接收导出文件的 bucket。",
+		},
+		r2KeyPrefix: {
+			title: "R2 Key 前缀",
+			description: "上传 object key 前追加的可选前缀。",
+		},
+		r2AccessKeyId: {
+			title: "R2 Access Key ID",
+			description: "Cloudflare R2 的 S3 access key ID。",
+		},
+		r2SecretAccessKey: {
+			title: "R2 Secret Access Key",
+			description: "会以明文形式保存在本地插件配置中。",
+		},
+		cloudPublishMode: {
+			title: "发布模式",
+			description: "可撤销链接模式为后续 Worker + KV 实现预留。",
+			options: {
+				"预签名 URL": "presigned-url",
+				"可撤销链接": "revocable-link",
+			},
+		},
+		createPresignedUrl: {
+			title: "生成预签名 URL",
+			description: "上传后为导出入口 HTML 生成预签名 URL。",
+		},
+		presignedUrlExpireSeconds: {
+			title: "预签名 URL 过期秒数",
+			description: "最大支持 604800 秒。",
+			validationError: "请输入正整数。",
+		},
+		workerBaseUrl: {
+			title: "Worker Base URL",
+			description: "为可撤销链接预留，第一版暂不使用。",
+		},
+		workerAdminToken: {
+			title: "Worker Admin Token",
+			description: "为可撤销链接预留，会以明文形式保存在本地插件配置中。",
+		},
+		revocableLinkReserved: {
+			title: "可撤销链接",
+			description: "当前已预留接口，但 Worker + KV 可撤销链接第一版暂不实现。",
+		},
+		webdavUrl: {
+			title: "WebDAV URL",
+			description: "用于下载远端配置的 WebDAV 目录 URL。",
+		},
+		webdavUsername: {
+			title: "WebDAV 用户名",
+			description: "可选的 Basic Auth 用户名。",
+		},
+		webdavPassword: {
+			title: "WebDAV 密码",
+			description: "可选的 Basic Auth 密码，会以明文形式保存在本地插件配置中。",
+		},
+		webdavRemotePath: {
+			title: "WebDAV 远端路径",
+			description: "WebDAV URL 下的远端 JSON 配置路径。",
+		},
+		webdavDownloadCloud: {
+			title: "下载云发布配置",
+			description: "从 WebDAV 下载配置，并且只覆盖云发布相关设置。",
+			button: "下载云发布配置",
+		},
+		webdavDownloadAll: {
+			title: "覆盖全部插件配置",
+			description: "从 WebDAV 下载配置，确认后覆盖完整插件设置。",
+			button: "覆盖全部",
 		},
 		obsidianSettingsSection: {
 			title: "Obsidian设置",

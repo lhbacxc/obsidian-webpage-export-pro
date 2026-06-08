@@ -1,14 +1,17 @@
-import { ButtonComponent, Modal, Setting, TFile } from 'obsidian';
+import { ButtonComponent, Modal, Notice, Setting, TFile } from 'obsidian';
 import { Utils } from 'src/plugin/utils/utils';
 import HTMLExportPlugin from 'src/plugin/main';
 import { ExportPreset, Settings, SettingsPage } from './settings';
 import { FilePickerTree } from 'src/plugin/features/file-picker';
 import { Path } from 'src/plugin/utils/path';
 import { FileDialogs } from 'src/plugin/utils/file-dialogs';
-import { createFileInput, createToggle } from './settings-components';
+import { createFileInput } from './settings-components';
 import { Website } from 'src/plugin/website/website';
 import { Index } from 'src/plugin/website';
 import { i18n } from '../translations/language';
+import { CloudPublishMode, CloudPublishSettings, sanitizeCloudPublishSettings } from '../cloud-publish/cloud-publish-settings';
+import { CloudPublishResult } from '../cloud-publish/cloud-publisher';
+import { ExportLog } from '../render-api/render-api';
 
 export interface ExportInfo
 {
@@ -16,7 +19,16 @@ export interface ExportInfo
 	pickedFiles: TFile[];
 	exportPath: Path;
 	validPath: boolean;
+	cloudPublishSettings: CloudPublishSettings;
 }
+
+export interface ExportModalResult {
+	exportPath: Path;
+	publishResult?: CloudPublishResult;
+	error?: unknown;
+}
+
+export type ExportModalSubmitHandler = (info: ExportInfo, modal: ExportModal) => Promise<ExportModalResult | undefined>;
 
 export class ExportModal extends Modal 
 {
@@ -26,6 +38,14 @@ export class ExportModal extends Modal
 	private filePicker: FilePickerTree;
 	private pickedFiles: TFile[] | undefined = undefined;
 	private validPath: boolean = true;
+	private exportButton?: ButtonComponent;
+	private exportResultEl?: HTMLElement;
+	private exportStatusEl?: HTMLElement;
+	private exportProgressValueEl?: HTMLProgressElement;
+	private exportProgressTitleEl?: HTMLElement;
+	private exportProgressSubEl?: HTMLElement;
+	private exportLinkInput?: HTMLInputElement;
+	private exportCopyButton?: ButtonComponent;
 	public static title: string = i18n.exportModal.title;
 
 	public exportInfo: ExportInfo;
@@ -44,7 +64,7 @@ export class ExportModal extends Modal
 	 * @returns True if the EXPORT button was pressed, false is the export was canceled.
 	 * @override
 	*/
-	async open(): Promise<ExportInfo> 
+	async open(onExport?: ExportModalSubmitHandler): Promise<ExportInfo>
 	{
 		this.isClosed = false;
 		this.canceled = true;
@@ -215,7 +235,44 @@ export class ExportModal extends Modal
 
 		
 
-		createToggle(contentEl, lang.openAfterExport, () => Settings.openAfterExport, (value) => Settings.openAfterExport = value);
+		let temporaryPublishMode: CloudPublishMode = Settings.cloudPublish.publishMode;
+		let temporaryExpireSeconds = Settings.cloudPublish.presignedUrlExpireSeconds;
+
+		const cloudPublishSetting = new Setting(contentEl)
+			.setName(lang.cloudPublish.title)
+			.setDesc(lang.cloudPublish.description)
+			.setHeading()
+			.addDropdown((dropdown) => dropdown
+				.addOption("presigned-url", lang.cloudPublish.presignedUrl)
+				.addOption("revocable-link", lang.cloudPublish.revocableLink)
+				.setValue(temporaryPublishMode)
+				.onChange((value) =>
+				{
+					temporaryPublishMode = value as CloudPublishMode;
+				}));
+		cloudPublishSetting.settingEl.style.paddingRight = "1em";
+
+		const expireError = contentEl.createDiv({ cls: "setting-item-description" });
+		expireError.style.color = "var(--color-red)";
+		expireError.style.marginBottom = "0.75rem";
+		new Setting(contentEl)
+			.setName(lang.cloudPublish.expireSeconds)
+			.setDesc(lang.cloudPublish.expireSecondsDescription)
+			.addText((text) => text
+				.setValue(temporaryExpireSeconds.toString())
+				.onChange((value) =>
+				{
+					if (!/^[1-9]\d*$/.test(value))
+					{
+						expireError.setText(lang.cloudPublish.expireSecondsError);
+						setExportDisabled(true);
+						return;
+					}
+
+					expireError.setText("");
+					temporaryExpireSeconds = parseInt(value, 10);
+					onChangedValidate(new Path(exportPathInput.textInput.getValue()));
+				}));
 
 		let exportButton : ButtonComponent | undefined = undefined;
 
@@ -290,12 +347,50 @@ export class ExportModal extends Modal
 		const { fileInput } = exportPathInput;
 		
 		fileInput.addButton((button) => {
+			this.exportButton = button;
 			exportButton = button;
 			setExportDisabled(!this.validPath);
 			button.setButtonText(lang.exportButton).onClick(async () => 
 			{
 				this.canceled = false;
-				this.close();
+				this.pickedFiles = this.filePicker.getSelectedFiles();
+				this.exportInfo = {
+					canceled: false,
+					pickedFiles: this.pickedFiles,
+					exportPath: new Path(exportPathInput.textInput.getValue()),
+					validPath: this.validPath,
+					cloudPublishSettings: sanitizeCloudPublishSettings({
+						...Settings.cloudPublish,
+						publishMode: temporaryPublishMode,
+						createPresignedUrl: temporaryPublishMode === "presigned-url",
+						presignedUrlExpireSeconds: temporaryExpireSeconds,
+					}),
+				};
+
+				if (!onExport)
+				{
+					this.close();
+					return;
+				}
+
+				this.setExportRunning(true);
+				this.showExportStatus(lang.result.running);
+				this.showExportProgress(0, lang.result.running, "", "var(--interactive-accent)");
+				ExportLog.setProgressListener((update) => this.showExportProgress(update.fraction, update.message, update.subMessage, update.progressColor));
+				try
+				{
+					const result = await onExport(this.exportInfo, this);
+					this.showExportResult(result);
+				}
+				catch (error)
+				{
+					this.showExportResult({ exportPath: this.exportInfo.exportPath, error });
+				}
+				finally
+				{
+					ExportLog.setProgressListener(undefined);
+					this.setExportRunning(false);
+				}
 			});
 		});
 
@@ -315,13 +410,153 @@ export class ExportModal extends Modal
 			app.setting.openTabById('webpage-html-export');
 		}));
 
+		this.createResultSection(contentEl);
+
 		await Utils.waitUntil(() => this.isClosed, 60 * 60 * 1000, 10);
 		
 		this.pickedFiles = this.filePicker.getSelectedFiles();
 		this.filePickerModalEl.remove();
-		this.exportInfo = { canceled: this.canceled, pickedFiles: this.pickedFiles, exportPath: new Path(Settings.exportOptions.exportPath), validPath: this.validPath};
+		this.exportInfo = this.exportInfo ?? {
+			canceled: this.canceled,
+			pickedFiles: this.pickedFiles,
+			exportPath: new Path(Settings.exportOptions.exportPath),
+			validPath: this.validPath,
+			cloudPublishSettings: sanitizeCloudPublishSettings(Settings.cloudPublish),
+		};
 
 		return this.exportInfo;
+	}
+
+	private createResultSection(contentEl: HTMLElement)
+	{
+		const lang = i18n.exportModal.result;
+		this.exportResultEl = contentEl.createDiv({ cls: "setting-item" });
+		this.exportResultEl.style.display = "block";
+		this.exportResultEl.style.borderTop = "1px solid var(--background-modifier-border)";
+		this.exportResultEl.style.paddingTop = "1em";
+		this.exportResultEl.style.marginTop = "0.5em";
+
+		this.exportResultEl.createEl("div", { text: lang.title }).style.fontWeight = "600";
+		this.exportStatusEl = this.exportResultEl.createDiv({ cls: "setting-item-description", text: lang.empty });
+		this.exportStatusEl.style.marginTop = "0.35em";
+		this.exportStatusEl.style.whiteSpace = "pre-wrap";
+
+		const progressWrap = this.exportResultEl.createDiv();
+		progressWrap.style.marginTop = "0.75em";
+
+		this.exportProgressTitleEl = progressWrap.createDiv();
+		this.exportProgressTitleEl.style.fontWeight = "600";
+		this.exportProgressTitleEl.style.marginBottom = "0.35em";
+
+		this.exportProgressValueEl = progressWrap.createEl("progress");
+		this.exportProgressValueEl.max = 1;
+		this.exportProgressValueEl.value = 0;
+		this.exportProgressValueEl.style.width = "100%";
+		this.exportProgressValueEl.style.height = "1rem";
+
+		this.exportProgressSubEl = progressWrap.createDiv({ cls: "setting-item-description" });
+		this.exportProgressSubEl.style.marginTop = "0.35em";
+		this.exportProgressSubEl.style.whiteSpace = "pre-wrap";
+
+		const linkRow = this.exportResultEl.createDiv();
+		linkRow.style.display = "flex";
+		linkRow.style.gap = "0.5em";
+		linkRow.style.marginTop = "0.75em";
+
+		this.exportLinkInput = linkRow.createEl("input");
+		this.exportLinkInput.type = "text";
+		this.exportLinkInput.readOnly = true;
+		this.exportLinkInput.placeholder = lang.noLink;
+		this.exportLinkInput.style.flex = "1";
+
+		this.exportCopyButton = new ButtonComponent(linkRow);
+		this.exportCopyButton.setButtonText(lang.copy);
+		this.exportCopyButton.setDisabled(true);
+		this.exportCopyButton.onClick(async () =>
+		{
+			const link = this.exportLinkInput?.value ?? "";
+			if (!link) return;
+			await navigator.clipboard.writeText(link);
+			new Notice(lang.copied, 3000);
+		});
+	}
+
+	private setExportRunning(running: boolean)
+	{
+		if (!this.exportButton) return;
+		this.exportButton.setDisabled(running);
+		this.exportButton.buttonEl.style.opacity = running ? "0.5" : "1";
+	}
+
+	private showExportStatus(message: string)
+	{
+		if (this.exportStatusEl) this.exportStatusEl.setText(message);
+		if (this.exportProgressTitleEl) this.exportProgressTitleEl.setText("");
+		if (this.exportProgressSubEl) this.exportProgressSubEl.setText("");
+		if (this.exportLinkInput) this.exportLinkInput.value = "";
+		this.exportCopyButton?.setDisabled(true);
+	}
+
+	private showExportProgress(fraction: number, message: string, subMessage: string, progressColor: string)
+	{
+		if (this.exportProgressValueEl)
+		{
+			this.exportProgressValueEl.value = fraction;
+			this.exportProgressValueEl.style.setProperty("--accent", progressColor);
+			this.exportProgressValueEl.style.color = progressColor;
+		}
+
+		if (this.exportProgressTitleEl)
+		{
+			const percent = Math.round(fraction * 100);
+			this.exportProgressTitleEl.setText(`${percent}% ${message}`);
+		}
+
+		if (this.exportProgressSubEl)
+		{
+			this.exportProgressSubEl.setText(subMessage);
+		}
+	}
+
+	private showExportResult(result: ExportModalResult | undefined)
+	{
+		const lang = i18n.exportModal.result;
+		if (!result)
+		{
+			this.showExportStatus(lang.cancelled);
+			return;
+		}
+
+		if (result.error)
+		{
+			this.showExportStatus(lang.failed + "\n" + result.error);
+			return;
+		}
+
+		const publishResult = result.publishResult;
+		let message = `${lang.finished}\n${result.exportPath.path}`;
+
+		if (publishResult)
+		{
+			message += `\n${lang.uploaded}: ${publishResult.uploadedCount}`;
+			if (publishResult.failedCount > 0) message += `\n${lang.failedCount}: ${publishResult.failedCount}`;
+			if (publishResult.warnings.length > 0) message += "\n" + publishResult.warnings.slice(0, 3).join("\n");
+		}
+
+		if (this.exportStatusEl) this.exportStatusEl.setText(message);
+		this.showExportProgress(1, lang.finished, result.exportPath.path, "var(--interactive-accent)");
+
+		if (publishResult?.presignedUrl && this.exportLinkInput)
+		{
+			this.exportLinkInput.value = publishResult.presignedUrl;
+			this.exportCopyButton?.setDisabled(false);
+		}
+		else if (this.exportLinkInput)
+		{
+			this.exportLinkInput.value = "";
+			this.exportLinkInput.placeholder = lang.noLink;
+			this.exportCopyButton?.setDisabled(true);
+		}
 	}
 
 	onClose() 

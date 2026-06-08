@@ -1225,7 +1225,7 @@ export namespace _MarkdownRendererInternal {
 			batchDocument.write("<body></body>");
 		}
 
-		renderLeaf = TabManager.openNewTab("tab", "horizontal", true);
+		renderLeaf = TabManager.openNewTab("tab", "horizontal", options.displayProgress);
 		markdownView = new MarkdownView(renderLeaf);
 
 		// @ts-ignore
@@ -1253,7 +1253,7 @@ export namespace _MarkdownRendererInternal {
 
 		document.body.classList.add("html-export-running");
 
-		if (overlayProgress)
+		if (overlayProgress && options.displayProgress)
 			createLoadingContainer();
 	}
 
@@ -1455,6 +1455,14 @@ export namespace ExportLog {
 	export let fullLog: string = "";
 	let totalProgress = 1;
 	let currentProgress = 0;
+	export interface ProgressUpdate {
+		fraction: number;
+		message: string;
+		subMessage: string;
+		progressColor: string;
+	}
+	type ProgressListener = (progress: ProgressUpdate) => void;
+	let progressListener: ProgressListener | undefined;
 
 	function logToString(message: any, title: string) {
 		const messageString = (typeof message === "string") ? message : JSON.stringify(message).replaceAll("\n", "\n\t\t");
@@ -1526,14 +1534,20 @@ export namespace ExportLog {
 		currentProgress = 0;
 	}
 
+	export function setProgressListener(listener: ProgressListener | undefined) {
+		progressListener = listener;
+	}
+
 	export function progress(progressBy: number, message: string, subMessage: string, progressColor: string = "var(--interactive-accent)") {
 		currentProgress += progressBy;
 		setProgress(currentProgress / totalProgress, message, subMessage, progressColor);
 	}
 
 	export function setProgress(fraction: number, message: string, subMessage: string, progressColor: string = "var(--interactive-accent)") {
+		fraction = Math.max(0, Math.min(1, fraction));
 		fullLog += logToString({ fraction, message, subMessage }, "Progress");
 		pullPathLogs();
+		progressListener?.({ fraction, message, subMessage, progressColor });
 		_MarkdownRendererInternal._reportProgress(fraction, message, subMessage, progressColor);
 	}
 
