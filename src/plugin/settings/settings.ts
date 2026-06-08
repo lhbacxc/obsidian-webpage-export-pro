@@ -14,6 +14,7 @@ import postcss from 'postcss';
 import safeParser from 'postcss-safe-parser';
 import { CloudPublishMode, CloudPublishSettings, CloudUploadStrategy, DEFAULT_CLOUD_PUBLISH_SETTINGS, sanitizeCloudPublishSettings } from '../cloud-publish/cloud-publish-settings';
 import { downloadWebdavConfig } from '../cloud-publish/webdav-config-sync';
+import { CloudPublishHistoryEntry, sanitizeCloudPublishHistory } from '../cloud-publish/cloud-publish-history';
 
 // #region Settings Definition
 
@@ -47,6 +48,7 @@ export class Settings
 	public static exportPreset: ExportPreset = ExportPreset.Online;
 	public static openAfterExport: boolean = true;
 	public static cloudPublish: CloudPublishSettings = sanitizeCloudPublishSettings(DEFAULT_CLOUD_PUBLISH_SETTINGS);
+	public static cloudPublishHistory: CloudPublishHistoryEntry[] = [];
 
 	// Graph View Settings
 	public static filePickerBlacklist: string[] = ["(^|\\/)node_modules\\/","(^|\\/)dist\\/","(^|\\/)dist-ssr\\/","(^|\\/)\\.vscode\\/"]; // ignore node_modules, dist, and .vscode
@@ -840,6 +842,7 @@ export class SettingsPage extends PluginSettingTab
 		// Reconstruct feature option instances to preserve constructor-set properties
 		Settings.exportOptions.reconstructFeatureOptions();
 		Settings.cloudPublish = sanitizeCloudPublishSettings(Settings.cloudPublish);
+		Settings.cloudPublishHistory = sanitizeCloudPublishHistory(Settings.cloudPublishHistory);
 		SettingsPage.saveSettings();
 		SettingsPage.loaded = true;
 	}

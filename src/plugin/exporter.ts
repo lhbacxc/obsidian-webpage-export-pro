@@ -8,6 +8,7 @@ import { ExportInfo, ExportModal } from "src/plugin/settings/export-modal";
 import { Webpage } from "./website/webpage";
 import { CloudPublisher, CloudPublishResult } from "./cloud-publish/cloud-publisher";
 import { CloudPublishSettings } from "./cloud-publish/cloud-publish-settings";
+import { appendCloudPublishHistory, normalizeCloudPublishExpiresInSeconds } from "./cloud-publish/cloud-publish-history";
 
 export class HTMLExporter
 {
@@ -65,7 +66,11 @@ export class HTMLExporter
 			if (!website) return;
 
 			const publishResult = await HTMLExporter.publishAfterExport(exportPath, files, cloudPublishSettings);
-			if (publishResult) await HTMLExporter.cleanupLocalExportAfterPublish(exportPath, cloudPublishSettings, publishResult);
+			if (publishResult)
+			{
+				await HTMLExporter.recordCloudPublishHistory(exportPath, cloudPublishSettings, publishResult);
+				await HTMLExporter.cleanupLocalExportAfterPublish(exportPath, cloudPublishSettings, publishResult);
+			}
 			new Notice(HTMLExporter.exportCompleteMessage(exportPath, publishResult), 8000);
 			return { exportPath, publishResult };
 		}
@@ -133,6 +138,33 @@ export class HTMLExporter
 		if (HTMLExporter.shouldRemoveExportDirectoryRoot(cloudPublishSettings))
 		{
 			await Path.removeEmptyDirectories(exportPath.path);
+		}
+	}
+
+	private static async recordCloudPublishHistory(exportPath: Path, cloudPublishSettings: CloudPublishSettings, publishResult: CloudPublishResult): Promise<void>
+	{
+		if (!publishResult.presignedUrl || !publishResult.entryKey) return;
+
+		const createdAt = Date.now();
+		const expiresInSeconds = normalizeCloudPublishExpiresInSeconds(cloudPublishSettings.presignedUrlExpireSeconds);
+		Settings.cloudPublishHistory = appendCloudPublishHistory(Settings.cloudPublishHistory, {
+			linkType: "presigned-url",
+			url: publishResult.presignedUrl,
+			entryKey: publishResult.entryKey,
+			exportPath: exportPath.path,
+			createdAt,
+			expiresInSeconds,
+			expiresAt: createdAt + expiresInSeconds * 1000,
+			uploadedCount: publishResult.uploadedCount,
+		});
+
+		try
+		{
+			await SettingsPage.saveSettings();
+		}
+		catch (error)
+		{
+			ExportLog.warning("Cloud publish history could not be saved: " + error);
 		}
 	}
 

@@ -23,6 +23,28 @@ export interface i18n
 	},
 	updateAvailable: string;
 	exportAsHTML: string;
+	viewCloudPublishHistory: string;
+	cloudPublishHistory: {
+		title: string;
+		empty: string;
+		search: string;
+		searchPlaceholder: string;
+		all: string;
+		noMatches: string;
+		linkType: string;
+		presignedUrl: string;
+		revocableLink: string;
+		entryKey: string;
+		createdAt: string;
+		expiresIn: string;
+		expiresAt: string;
+		uploadedCount: string;
+		status: string;
+		active: string;
+		expired: string;
+		copy: string;
+		copied: string;
+	};
 	exportModal: 
 	{
 		title: string;

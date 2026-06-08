@@ -7,6 +7,7 @@ import { Settings, SettingsPage } from 'src/plugin/settings/settings';
 import { HTMLExporter } from 'src/plugin/exporter';
 import { Path } from 'src/plugin/utils/path';
 import { ExportModal } from 'src/plugin/settings/export-modal';
+import { CloudPublishHistoryModal } from 'src/plugin/settings/cloud-publish-history-modal';
 import { _MarkdownRendererInternal, ExportLog, MarkdownRendererAPI } from 'src/plugin/render-api/render-api';
 import { DataviewRenderer } from './render-api/dataview-renderer';
 import { Website } from './website/website';
@@ -92,6 +93,14 @@ export default class HTMLExportPlugin extends Plugin {
 			name: "Set html export settings",
 			callback: () => {
 				HTMLExporter.export(false);
+			},
+		});
+
+		this.addCommand({
+			id: "view-cloud-publish-history",
+			name: i18n.viewCloudPublishHistory,
+			callback: () => {
+				new CloudPublishHistoryModal().open();
 			},
 		});
 
