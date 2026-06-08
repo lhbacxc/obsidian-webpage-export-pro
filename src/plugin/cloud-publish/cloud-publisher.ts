@@ -1,7 +1,9 @@
 const pathTools = require("upath");
+import type { TFile } from "obsidian";
 import { readdir } from "fs/promises";
 import { ExportPipelineOptions } from "src/plugin/website/pipeline-options";
 import { Path } from "src/plugin/utils/path";
+import { getCombinedHtmlFileName } from "src/plugin/website/website";
 import { CloudPublishSettings, cloudPublishConfigComplete, CloudUploadStrategy, normalizeKeyPrefix } from "./cloud-publish-settings";
 import { R2Client, R2UploadObject } from "./r2-client";
 
@@ -16,6 +18,7 @@ export interface CloudPublishResult {
 
 export interface CloudPublishRequest {
 	destination: Path;
+	files: TFile[];
 	exportOptions: ExportPipelineOptions;
 	settings: CloudPublishSettings;
 }
@@ -45,7 +48,7 @@ export class CloudPublisher {
 			return result;
 		}
 
-		const candidates = await collectUploadCandidates(request.destination, request.exportOptions, this.settings);
+		const candidates = await collectUploadCandidates(request.destination, request.files, request.exportOptions, this.settings);
 		if (candidates.length === 0) {
 			result.warnings.push("Cloud publish skipped because no exported files were found.");
 			return result;
@@ -81,10 +84,10 @@ export class CloudPublisher {
 	}
 }
 
-export async function collectUploadCandidates(destination: Path, exportOptions: ExportPipelineOptions, settings: CloudPublishSettings): Promise<UploadCandidate[]> {
+export async function collectUploadCandidates(destination: Path, sourceFiles: TFile[], exportOptions: ExportPipelineOptions, settings: CloudPublishSettings): Promise<UploadCandidate[]> {
 	const strategy = resolveStrategy(settings.uploadStrategy, exportOptions);
 	if (strategy === "single-html") {
-		const htmlPath = await findSingleHtmlExport(destination, exportOptions);
+		const htmlPath = findSingleHtmlExport(destination, sourceFiles, exportOptions);
 		if (!htmlPath) return [];
 		return [{
 			path: htmlPath,
@@ -108,12 +111,11 @@ function resolveStrategy(strategy: CloudUploadStrategy, exportOptions: ExportPip
 	return strategy;
 }
 
-async function findSingleHtmlExport(destination: Path, exportOptions: ExportPipelineOptions): Promise<Path | undefined> {
-	const expected = destination.joinString(exportOptions.siteName + ".html");
+function findSingleHtmlExport(destination: Path, sourceFiles: TFile[], exportOptions: ExportPipelineOptions): Path | undefined {
+	if (sourceFiles.length === 0) return;
+	const expected = destination.joinString(getCombinedHtmlFileName(sourceFiles, exportOptions));
 	if (expected.exists && expected.isFileFS) return expected;
-
-	const files = await listFilesRecursive(destination);
-	return files.find(file => file.extensionName.toLowerCase() === "html");
+	return;
 }
 
 function findEntryPath(destination: Path, files: Path[]): Path | undefined {

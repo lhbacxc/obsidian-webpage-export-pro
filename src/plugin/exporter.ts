@@ -64,7 +64,7 @@ export class HTMLExporter
 			const website = await HTMLExporter.exportFiles(files, exportPath, true, Settings.deleteOldFiles, quietProgress);
 			if (!website) return;
 
-			const publishResult = await HTMLExporter.publishAfterExport(exportPath, cloudPublishSettings);
+			const publishResult = await HTMLExporter.publishAfterExport(exportPath, files, cloudPublishSettings);
 			if (publishResult) await HTMLExporter.cleanupLocalExportAfterPublish(exportPath, cloudPublishSettings, publishResult);
 			new Notice(HTMLExporter.exportCompleteMessage(exportPath, publishResult), 8000);
 			return { exportPath, publishResult };
@@ -77,7 +77,7 @@ export class HTMLExporter
 		}
 	}
 
-	private static async publishAfterExport(exportPath: Path, cloudPublishSettings: CloudPublishSettings): Promise<CloudPublishResult | undefined>
+	private static async publishAfterExport(exportPath: Path, files: TFile[], cloudPublishSettings: CloudPublishSettings): Promise<CloudPublishResult | undefined>
 	{
 		if (!cloudPublishSettings.enabled) return;
 
@@ -86,6 +86,7 @@ export class HTMLExporter
 			const publisher = new CloudPublisher(cloudPublishSettings);
 			const result = await publisher.publish({
 				destination: exportPath,
+				files,
 				exportOptions: Settings.exportOptions,
 				settings: cloudPublishSettings,
 			});

@@ -544,7 +544,17 @@ export class Website
 	public async saveAsCombinedHTML(): Promise<void>
 	{
 		const html = await this.getCombinedHTML();
-		const path = this.destination.joinString(this.exportOptions.siteName + ".html");
+		const path = this.destination.joinString(getCombinedHtmlFileName(this.sourceFiles, this.exportOptions));
 		await path.write(html);
 	}
+}
+
+export function getCombinedHtmlFileName(sourceFiles: TFile[], exportOptions: ExportPipelineOptions): string
+{
+	if (sourceFiles.length === 1)
+	{
+		return new Path(sourceFiles[0].name).setExtension("html").fullName;
+	}
+
+	return new Path(exportOptions.siteName || app.vault.getName()).setExtension("html").fullName;
 }
