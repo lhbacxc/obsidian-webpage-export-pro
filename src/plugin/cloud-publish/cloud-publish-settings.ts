@@ -12,6 +12,7 @@ export interface CloudPublishSettings {
 	keyPrefix: string;
 	publishMode: CloudPublishMode;
 	createPresignedUrl: boolean;
+	keepLocalFilesAfterPublish: boolean;
 	presignedUrlExpireSeconds: number;
 	workerBaseUrl: string;
 	workerAdminToken: string;
@@ -32,6 +33,7 @@ export const DEFAULT_CLOUD_PUBLISH_SETTINGS: CloudPublishSettings = {
 	keyPrefix: "",
 	publishMode: "presigned-url",
 	createPresignedUrl: true,
+	keepLocalFilesAfterPublish: true,
 	presignedUrlExpireSeconds: 604800,
 	workerBaseUrl: "",
 	workerAdminToken: "",
@@ -76,6 +78,7 @@ export function sanitizeCloudPublishSettings(source: unknown): CloudPublishSetti
 		keyPrefix: normalizeKeyPrefix(stringValue(raw.keyPrefix)),
 		publishMode: enumValue(raw.publishMode, publishModes, defaults.publishMode),
 		createPresignedUrl: booleanValue(raw.createPresignedUrl, defaults.createPresignedUrl),
+		keepLocalFilesAfterPublish: booleanValue(raw.keepLocalFilesAfterPublish, defaults.keepLocalFilesAfterPublish),
 		presignedUrlExpireSeconds: numberValue(raw.presignedUrlExpireSeconds, defaults.presignedUrlExpireSeconds),
 		workerBaseUrl: stringValue(raw.workerBaseUrl).trim(),
 		workerAdminToken: stringValue(raw.workerAdminToken),

@@ -65,6 +65,7 @@ export class HTMLExporter
 			if (!website) return;
 
 			const publishResult = await HTMLExporter.publishAfterExport(exportPath, cloudPublishSettings);
+			if (publishResult) await HTMLExporter.cleanupLocalExportAfterPublish(exportPath, cloudPublishSettings, publishResult);
 			new Notice(HTMLExporter.exportCompleteMessage(exportPath, publishResult), 8000);
 			return { exportPath, publishResult };
 		}
@@ -102,9 +103,52 @@ export class HTMLExporter
 			return {
 				uploadedCount: 0,
 				failedCount: 1,
+				uploadedPaths: [],
 				warnings: ["Cloud publish failed: " + error],
 			};
 		}
+	}
+
+	private static async cleanupLocalExportAfterPublish(exportPath: Path, cloudPublishSettings: CloudPublishSettings, publishResult: CloudPublishResult): Promise<void>
+	{
+		if (cloudPublishSettings.keepLocalFilesAfterPublish) return;
+		if (!HTMLExporter.canRemoveLocalExportAfterPublish(cloudPublishSettings, publishResult)) return;
+
+		const uploadedPaths = [...new Set(publishResult.uploadedPaths)]
+			.map(path => new Path(path, ""))
+			.sort((a, b) => b.depth - a.depth);
+
+		for (const uploadedPath of uploadedPaths)
+		{
+			const deleted = await uploadedPath.delete();
+			if (!deleted)
+			{
+				const warning = "Cloud publish succeeded, but local export cleanup failed for: " + uploadedPath.path;
+				publishResult.warnings.push(warning);
+				ExportLog.warning(warning);
+			}
+		}
+
+		if (HTMLExporter.shouldRemoveExportDirectoryRoot(cloudPublishSettings))
+		{
+			await Path.removeEmptyDirectories(exportPath.path);
+		}
+	}
+
+	private static canRemoveLocalExportAfterPublish(cloudPublishSettings: CloudPublishSettings, publishResult: CloudPublishResult): boolean
+	{
+		if (publishResult.uploadedCount <= 0) return false;
+		if (publishResult.failedCount > 0) return false;
+		if (cloudPublishSettings.publishMode !== "presigned-url") return false;
+		if (!publishResult.presignedUrl) return false;
+		return true;
+	}
+
+	private static shouldRemoveExportDirectoryRoot(cloudPublishSettings: CloudPublishSettings): boolean
+	{
+		if (cloudPublishSettings.uploadStrategy === "directory") return true;
+		if (cloudPublishSettings.uploadStrategy === "single-html") return false;
+		return !Settings.exportOptions.combineAsSingleFile;
 	}
 
 	private static exportCompleteMessage(exportPath: Path, publishResult: CloudPublishResult | undefined): string

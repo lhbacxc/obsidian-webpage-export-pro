@@ -28,8 +28,11 @@ export const language: i18n =
 		cloudPublish: {
 			title: "本次云发布",
 			description: "这些选项只影响本次导出，不会写回插件设置。",
+			disabled: "关闭",
 			presignedUrl: "预签名 URL",
 			revocableLink: "可撤销链接",
+			keepLocalFiles: "云发布后保留本地 HTML 文件",
+			keepLocalFilesDescription: "关闭后，仅在本次云发布成功后删除本次导出的本地产物。",
 			expireSeconds: "过期秒数",
 			expireSecondsDescription: "仅用于本次导出的预签名 URL，最大支持 604800 秒。",
 			expireSecondsError: "请输入正整数。",

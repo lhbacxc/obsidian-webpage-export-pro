@@ -33,8 +33,11 @@ export interface i18n
 		cloudPublish: {
 			title: string;
 			description: string;
+			disabled: string;
 			presignedUrl: string;
 			revocableLink: string;
+			keepLocalFiles: string;
+			keepLocalFilesDescription: string;
 			expireSeconds: string;
 			expireSecondsDescription: string;
 			expireSecondsError: string;

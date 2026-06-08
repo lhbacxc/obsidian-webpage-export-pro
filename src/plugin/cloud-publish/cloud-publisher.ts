@@ -10,6 +10,7 @@ export interface CloudPublishResult {
 	failedCount: number;
 	entryKey?: string;
 	presignedUrl?: string;
+	uploadedPaths: string[];
 	warnings: string[];
 }
 
@@ -34,6 +35,7 @@ export class CloudPublisher {
 		const result: CloudPublishResult = {
 			uploadedCount: 0,
 			failedCount: 0,
+			uploadedPaths: [],
 			warnings: [],
 		};
 
@@ -53,6 +55,7 @@ export class CloudPublisher {
 			try {
 				await this.r2Client.uploadObject(candidate);
 				result.uploadedCount++;
+				result.uploadedPaths.push(candidate.path.absoluted().pathname);
 				if (candidate.isEntry) result.entryKey = candidate.key;
 			}
 			catch (error) {

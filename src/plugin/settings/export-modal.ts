@@ -28,6 +28,8 @@ export interface ExportModalResult {
 	error?: unknown;
 }
 
+type TemporaryCloudPublishMode = "off" | CloudPublishMode;
+
 export type ExportModalSubmitHandler = (info: ExportInfo, modal: ExportModal) => Promise<ExportModalResult | undefined>;
 
 export class ExportModal extends Modal 
@@ -235,7 +237,8 @@ export class ExportModal extends Modal
 
 		
 
-		let temporaryPublishMode: CloudPublishMode = Settings.cloudPublish.publishMode;
+		let temporaryPublishMode: TemporaryCloudPublishMode = Settings.cloudPublish.enabled ? Settings.cloudPublish.publishMode : "off";
+		let temporaryKeepLocalFilesAfterPublish = true;
 		let temporaryExpireSeconds = Settings.cloudPublish.presignedUrlExpireSeconds;
 
 		const cloudPublishSetting = new Setting(contentEl)
@@ -243,14 +246,26 @@ export class ExportModal extends Modal
 			.setDesc(lang.cloudPublish.description)
 			.setHeading()
 			.addDropdown((dropdown) => dropdown
+				.addOption("off", lang.cloudPublish.disabled)
 				.addOption("presigned-url", lang.cloudPublish.presignedUrl)
 				.addOption("revocable-link", lang.cloudPublish.revocableLink)
 				.setValue(temporaryPublishMode)
 				.onChange((value) =>
 				{
-					temporaryPublishMode = value as CloudPublishMode;
+					temporaryPublishMode = value as TemporaryCloudPublishMode;
+					updateCloudPublishChildVisibility();
 				}));
 		cloudPublishSetting.settingEl.style.paddingRight = "1em";
+
+		const keepLocalFilesSetting = new Setting(contentEl)
+			.setName(lang.cloudPublish.keepLocalFiles)
+			.setDesc(lang.cloudPublish.keepLocalFilesDescription)
+			.addToggle((toggle) => toggle
+				.setValue(temporaryKeepLocalFilesAfterPublish)
+				.onChange((value) =>
+				{
+					temporaryKeepLocalFilesAfterPublish = value;
+				}));
 
 		const expireError = contentEl.createDiv({ cls: "setting-item-description" });
 		expireError.style.color = "var(--color-red)";
@@ -273,6 +288,13 @@ export class ExportModal extends Modal
 					temporaryExpireSeconds = parseInt(value, 10);
 					onChangedValidate(new Path(exportPathInput.textInput.getValue()));
 				}));
+
+		function updateCloudPublishChildVisibility()
+		{
+			keepLocalFilesSetting.settingEl.style.display = temporaryPublishMode === "off" ? "none" : "";
+		}
+
+		updateCloudPublishChildVisibility();
 
 		let exportButton : ButtonComponent | undefined = undefined;
 
@@ -361,8 +383,10 @@ export class ExportModal extends Modal
 					validPath: this.validPath,
 					cloudPublishSettings: sanitizeCloudPublishSettings({
 						...Settings.cloudPublish,
-						publishMode: temporaryPublishMode,
+						enabled: temporaryPublishMode !== "off",
+						publishMode: temporaryPublishMode === "off" ? Settings.cloudPublish.publishMode : temporaryPublishMode,
 						createPresignedUrl: temporaryPublishMode === "presigned-url",
+						keepLocalFilesAfterPublish: temporaryPublishMode === "off" ? true : temporaryKeepLocalFilesAfterPublish,
 						presignedUrlExpireSeconds: temporaryExpireSeconds,
 					}),
 				};

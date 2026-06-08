@@ -28,8 +28,11 @@ export const language: i18n =
 		cloudPublish: {
 			title: "Cloud publish for this export",
 			description: "These options only affect this export and are not saved to plugin settings.",
+			disabled: "Off",
 			presignedUrl: "Presigned URL",
 			revocableLink: "Revocable link",
+			keepLocalFiles: "Keep local HTML files after cloud publish",
+			keepLocalFilesDescription: "When disabled, this export's local output is deleted only after cloud publish succeeds.",
 			expireSeconds: "Expiry seconds",
 			expireSecondsDescription: "Used only for this export's presigned URL. Maximum supported value is 604800 seconds.",
 			expireSecondsError: "Enter a positive integer.",
